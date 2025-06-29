@@ -1,0 +1,32 @@
+#:include kv/sistemapage.kv
+#:include kv/selecionarpage.kv
+#:import utils kivy.utils
+
+FloatLayout:
+    canvas:
+        Color:
+            rgb: utils.get_color_from_hex('#001824')
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    Label:
+        canvas.before:
+            Rectangle:
+                size: self.size
+                pos: self.pos
+                source: 'icones2/botao_fino.png'
+        pos_hint: {'rigth': 0.99, 'top': 0.99}
+        size_hint: 0.98, 0.1
+        bold: True
+        text: 'Ferramenta de Análise de Falhas'
+        id: label_main
+    ScreenManager:
+        pos_hint: {'rigth': 1, 'top': 0.88}
+        size_hint: 1, 0.87
+        id: screen_manager
+        SistemaPage: 
+            name: 'sistemapage'
+            id: sistemapage
+        SelecionarPage:
+            name: 'selecionarpage'
+            id: selecionarpage
