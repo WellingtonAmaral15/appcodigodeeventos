@@ -129,7 +129,7 @@ class MainApp(App):
                         lista_cod_selecionar.add_widget(banner)
         time.sleep(1)
         texto_input = pagina_selecionar.ids['codigo_input']
-        if imagem == 'EIMS NUM.xlsm' or imagem == 'TMS NUM.xlsm':  
+        if imagem == 'EIMS NUM.xlsm' or imagem == 'TMS NUM.xlsm' or imagem == 'FREIO KNORR NUM.xlsm':  
             texto_input.hint_text = 'Digite o Código numérico e Click no Botão Verde ao Lado'
         else:
             texto_input.hint_text = 'Digite o Código alfabético e Click no Botão Verde ao Lado'
@@ -176,7 +176,7 @@ class MainApp(App):
         label_descricao = pagina_selecionar.ids['descricao']
         try:
             if codigo != '' or codigo != 'Código':
-                if sistema == 'EIMS NUM.xlsm' or sistema == 'TMS NUM.xlsm':
+                if sistema == 'EIMS NUM.xlsm' or sistema == 'TMS NUM.xlsm' or sistema == 'FREIO KNORR NUM.xlsm':
                     df_arquivo['CÓDIGO'].astype(int)
                     codigo = int(codigo)
                     if codigo in df_arquivo['CÓDIGO'].values:
@@ -224,6 +224,5 @@ class MainApp(App):
     def fechar_aplicativo(self):
         exit()
     
-
 MainApp().run()
         
