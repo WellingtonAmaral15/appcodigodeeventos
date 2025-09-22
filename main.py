@@ -118,7 +118,10 @@ class MainApp(App):
             for arquivo in arquivos:
                 if arquivo == imagem:
                     df_arquivo = pd.read_excel(f'arquivos/{arquivo}')
-                    lista_codigos = df_arquivo['CÓDIGO'].astype(str)
+                    if arquivo == 'FREIO KNORR NUM.xlsm':
+                        lista_codigos = df_arquivo['CÓDIGO'].astype(str).str.pad(width=4, side='left', fillchar='0')
+                    else:
+                        lista_codigos = df_arquivo['CÓDIGO'].astype(str)
                     pagina_selecionar = self.root.ids['selecionarpage']
                     lista_cod_selecionar = pagina_selecionar.ids['scroolview_selecionar']
                     for item in list(lista_cod_selecionar.children):
