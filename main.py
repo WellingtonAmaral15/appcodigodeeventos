@@ -10,7 +10,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.graphics import Color, Rectangle
 import pandas as pd
-import time
+#import time
 
 class SistemaPage(Screen):
     pass
@@ -130,7 +130,7 @@ class MainApp(App):
                         codigo = item  
                         banner = BannerSelecionar(codigo=codigo)
                         lista_cod_selecionar.add_widget(banner)
-        time.sleep(1)
+        #time.sleep(1)
         texto_input = pagina_selecionar.ids['codigo_input']
         if imagem == 'EIMS NUM.xlsm' or imagem == 'TMS NUM.xlsm' or imagem == 'FREIO KNORR NUM.xlsm':  
             texto_input.hint_text = 'Digite o Código numérico e Click no Botão Verde ao Lado'
