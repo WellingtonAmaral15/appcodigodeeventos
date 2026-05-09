@@ -1,0 +1,96 @@
+<SelecionarPage>:
+    FloatLayout:
+        canvas:
+            Rectangle:
+                size: self.size
+                pos: self.pos
+                source: 'icones2/bg1.png'
+        Image:
+            pos_hint: {'rigth': 1, 'top': 0.99}
+            size_hint: 1, 0.14
+            source: 'icones2/images.png'
+            id: imagem_selecionar
+        Label:
+            pos_hint: {'rigth': 1, 'top': 0.84}
+            size_hint: 1, 0.04
+            text: 'Sistema Selecionado'
+            murkup: True
+            id: label_sistema_selecionado
+        ScrollView:
+            pos_hint: {'rigth': 1, 'top': 0.78}
+            size_hint: 1, 0.25
+            GridLayout:
+                rows: 2
+                id: scroolview_selecionar
+                spacing: 2, 2
+                size_hint_x: None
+                width: self.minimum_width
+                col_default_width: '280dp'
+                col_force_default: True
+        FloatLayout:
+            #rows: 1
+            #pos_hint: {'right': 0.9, 'top': 0.5}
+            #size_hint: 0.8, 0.05
+            TextInput:
+                id: codigo_input
+                hint_text: 'Digite o Código e Click no Botão Verde ao Lado'
+                pos_hint: {'right': 0.6, 'top': 0.5}
+                size_hint: 0.5, 0.05
+                on_text_validate: app.selecionar_input(self.text)
+            Button:
+                pos_hint: {'right': 0.9, 'top': 0.5}
+                size_hint: 0.25, 0.05
+                background_color: 0, 1, 0, 1
+                text: 'Selecionar Código'
+                on_press: app.selecionar_input(codigo_input.text)
+        GridLayout:
+            rows: 1
+            pos_hint: {'rigth': 1, 'top': 0.43}
+            size_hint: 1, 0.1
+            Label:
+                bold: True
+                text: 'Código'
+                id: codigo_escolhido
+                markup: True
+            ImageButton:
+                source: 'icones2/lupa.png'
+                on_release: app.buscar_dados(codigo_input.text)
+        
+        GridLayout:
+            rows: 1
+            pos_hint: {'rigth': 1, 'top': 0.33}
+            size_hint: 1, 0.08
+            Label:
+                bold: True
+                text: 'Componente'
+                id: componente
+                markup: True
+        GridLayout:
+            rows: 1
+            pos_hint: {'rigth': 1, 'top': 0.25}
+            size_hint: 1, 0.15
+            Label:
+                font_size: '16sp'
+                bold: True
+                text: 'Descrição da Falha'
+                markup: True
+                id: descricao
+        GridLayout:
+            rows: 1
+            pos_hint: {'rigth': 1, 'top': 0.1}
+            size_hint: 1, 0.098
+            canvas:
+                Color:
+                    rgb: utils.get_color_from_hex('#006D7E')
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            ImageButton:
+                source: 'icones2/cruzar.png'
+                on_release: app.fechar_aplicativo()
+
+            Label:
+                
+            ImageButton:
+                source: 'icones2/voltar.png'
+                on_release: app.mudar_tela('sistemapage')

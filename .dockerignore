@@ -1,0 +1,15 @@
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+build/
+dist/
+kv/
+main.py
+main.kv
+main.spec
+buildozer.spec
+main_original_pandas_20260505_124529.py

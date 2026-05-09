@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: appcodigodeeventos-web
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-web.txt
+    startCommand: python web_app.py --host 0.0.0.0
+    autoDeployTrigger: commit
+    healthCheckPath: /api/systems

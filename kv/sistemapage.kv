@@ -1,0 +1,54 @@
+<SistemaPage>:
+    FloatLayout:
+        canvas:
+            Rectangle:
+                size: self.size
+                pos: self.pos
+                source: 'icones2/bg1.png'
+        Image:
+            pos_hint: {'rigth': 1, 'top': 0.99}
+            size_hint: 1, 0.14
+            source: 'icones2/images.png'
+            id: imagem_main
+        ScrollView:
+            pos_hint: {'rigth': 1, 'top': .84}
+            size_hint: 1, 0.54
+            GridLayout:
+                cols: 3
+                id: scroolview_sistema
+                size_hint_y: None
+                spacing: 2, 2
+                height: self.minimum_height
+                row_default_height: '90dp'
+                row_force_default: True
+                
+        Label:
+            pos_hint: {'rigth': 1, 'top': 0.3}
+            size_hint: 1, 0.18
+            canvas.before:
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+                    source: 'icones2/botao_fino.png'
+            bold: True
+            text: 'Selecione um Sistema'
+            murkup: True
+            id: sistema_selecionado
+        GridLayout:
+            rows: 1
+            pos_hint: {'rigth': 1, 'top': 0.12}
+            size_hint: 1, 0.12
+            canvas:
+                Color:
+                    rgb: utils.get_color_from_hex('#006D7E')
+                Rectangle:
+                    size: self.size
+                    pos: self.pos
+            ImageButton:
+                source: 'icones2/cruzar.png'
+                on_release: app.fechar_aplicativo()
+            Label:
+            ImageButton:
+                source: 'icones2/lupa.png'
+                on_release: app.buscar_sistema(), app.mudar_tela('selecionarpage')
+        
