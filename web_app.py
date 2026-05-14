@@ -564,9 +564,14 @@ def find_event(rows, code, filename):
     code = normalize_code(code)
     if filename in NUMERIC_SYSTEMS:
         code = code.lstrip("0") or "0"
+    else:
+        code = normalize_key(code)
     for row in rows:
         row_code = row["codigo"]
-        compare_code = row_code.lstrip("0") or "0" if filename in NUMERIC_SYSTEMS else row_code
+        if filename in NUMERIC_SYSTEMS:
+            compare_code = row_code.lstrip("0") or "0"
+        else:
+            compare_code = normalize_key(row_code)
         if compare_code == code:
             return row
     return None
