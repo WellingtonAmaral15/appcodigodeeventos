@@ -18,7 +18,7 @@ ARQUIVOS_DIR = APP_DIR / "arquivos"
 ICONES_DIR = APP_DIR / "icones"
 ICONES2_DIR = APP_DIR / "icones2"
 
-NUMERIC_SYSTEMS = {"EIMS NUM.xlsm", "TMS NUM.xlsm", "FREIO KNORR NUM.xlsm"}
+NUMERIC_SYSTEMS = {"EIMS NUM 2005.xlsm", "TMS NUM 3000.xlsm", "FREIO KNORR NUM 3000 4000 E 5000.xlsm"}
 CODE_KEY = "CODIGO"
 DESCRIPTION_KEY = "DESCRICAO"
 COMPONENT_KEY = "COMPONENTE"
@@ -511,7 +511,7 @@ def normalize_key(value):
 
 
 def format_visible_code(code, filename):
-    if filename == "FREIO KNORR NUM.xlsm" and code.isdigit():
+    if filename == "FREIO KNORR NUM 3000 4000 E 5000.xlsm" and code.isdigit():
         return code.zfill(4)
     return code
 
