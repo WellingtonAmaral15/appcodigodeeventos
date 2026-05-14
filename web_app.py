@@ -22,6 +22,20 @@ NUMERIC_SYSTEMS = {"EIMS NUM 2005.xlsm", "TMS NUM 3000.xlsm", "FREIO KNORR NUM 3
 CODE_KEY = "CODIGO"
 DESCRIPTION_KEY = "DESCRICAO"
 COMPONENT_KEY = "COMPONENTE"
+SYSTEM_DISPLAY_ORDER = [
+    "APU 2005 E 3000",
+    "CVS 4000 E 5000",
+    "EIMS 2005",
+    "EIMS NUM 2005",
+    "FREIO KNORR 3000 4000 E 5000",
+    "FREIO KNORR NUM 3000 4000 E 5000",
+    "VVVF 2005 E 3000",
+    "INVERSOR DE TRACAO 4000 E 5000",
+    "TMS 3000",
+    "TMS NUM 3000",
+    "EVR 4000 E 5000",
+    "PERFORMANCE 3000",
+]
 
 
 HTML_PAGE = r"""<!doctype html>
@@ -560,7 +574,12 @@ def find_event(rows, code, filename):
 
 def list_systems():
     systems = []
-    for icon_path in sorted(ICONES_DIR.glob("*.png"), key=lambda path: path.name.casefold()):
+    order_map = {normalize_key(name): index for index, name in enumerate(SYSTEM_DISPLAY_ORDER)}
+    icon_paths = sorted(
+        ICONES_DIR.glob("*.png"),
+        key=lambda path: (order_map.get(normalize_key(path.stem), len(order_map)), path.name.casefold()),
+    )
+    for icon_path in icon_paths:
         name = icon_path.stem
         filename = f"{name}.xlsm"
         if not (ARQUIVOS_DIR / filename).is_file():
