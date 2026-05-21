@@ -210,6 +210,10 @@ HTML_PAGE = r"""<!doctype html>
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 8px;
     }
+    .search-field {
+      position: relative;
+      min-width: 0;
+    }
     input[type="search"] {
       width: 100%;
       min-height: 44px;
@@ -219,6 +223,43 @@ HTML_PAGE = r"""<!doctype html>
       color: var(--ink);
       background: #fff;
       font: inherit;
+    }
+    .suggestions {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 10;
+      max-height: 240px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      box-shadow: 0 12px 24px rgba(17, 36, 45, .12);
+    }
+    .suggestions[hidden] {
+      display: none;
+    }
+    .suggestion-item {
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+    }
+    .suggestion-item:last-child {
+      border-bottom: 0;
+    }
+    .suggestion-item:hover,
+    .suggestion-item:focus-visible,
+    .suggestion-item.active {
+      background: #e8f5f6;
+      outline: none;
     }
     button.primary {
       min-height: 44px;
@@ -342,7 +383,10 @@ HTML_PAGE = r"""<!doctype html>
       </div>
 
       <form id="search-form" class="search-row">
-        <input id="code-input" type="search" autocomplete="off" placeholder="Digite o codigo">
+        <div class="search-field">
+          <input id="code-input" type="search" autocomplete="off" placeholder="Digite o codigo" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions-list">
+          <div id="suggestions-list" class="suggestions" hidden></div>
+        </div>
         <button class="primary" type="submit">Buscar</button>
       </form>
 
@@ -376,7 +420,7 @@ HTML_PAGE = r"""<!doctype html>
   </main>
 
   <script>
-    const state = { systems: [], selected: null, codes: [] };
+    const state = { systems: [], selected: null, codes: [], filteredCodes: [], highlightedSuggestion: -1 };
     const el = {
       systems: document.getElementById("systems"),
       selectedImage: document.getElementById("selected-image"),
@@ -384,6 +428,7 @@ HTML_PAGE = r"""<!doctype html>
       selectedHint: document.getElementById("selected-hint"),
       codeInput: document.getElementById("code-input"),
       searchForm: document.getElementById("search-form"),
+      suggestionsList: document.getElementById("suggestions-list"),
       codesList: document.getElementById("codes-list"),
       codesCount: document.getElementById("codes-count"),
       status: document.getElementById("status"),
@@ -395,6 +440,13 @@ HTML_PAGE = r"""<!doctype html>
     function asset(path) {
       return path.split("/").map(encodeURIComponent).join("/");
     }
+    function normalizeSearch(value) {
+      return value
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    }
     function setStatus(message, kind = "") {
       el.status.textContent = message;
       el.status.className = `status ${kind}`.trim();
@@ -403,6 +455,57 @@ HTML_PAGE = r"""<!doctype html>
       el.resultCode.textContent = "-";
       el.resultComponent.textContent = "-";
       el.resultDescription.textContent = "-";
+    }
+    function hideSuggestions() {
+      state.filteredCodes = [];
+      state.highlightedSuggestion = -1;
+      el.suggestionsList.hidden = true;
+      el.suggestionsList.innerHTML = "";
+      el.codeInput.setAttribute("aria-expanded", "false");
+    }
+    function renderSuggestions() {
+      el.suggestionsList.innerHTML = "";
+      if (!state.filteredCodes.length) {
+        el.suggestionsList.hidden = true;
+        el.codeInput.setAttribute("aria-expanded", "false");
+        return;
+      }
+      state.filteredCodes.forEach((code, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `suggestion-item${index === state.highlightedSuggestion ? " active" : ""}`;
+        button.textContent = code;
+        button.addEventListener("mousedown", event => {
+          event.preventDefault();
+          applySuggestion(code, true);
+        });
+        el.suggestionsList.appendChild(button);
+      });
+      el.suggestionsList.hidden = false;
+      el.codeInput.setAttribute("aria-expanded", "true");
+    }
+    function updateSuggestions() {
+      if (!state.selected) {
+        hideSuggestions();
+        return;
+      }
+      const term = normalizeSearch(el.codeInput.value);
+      if (!term) {
+        hideSuggestions();
+        return;
+      }
+      state.filteredCodes = state.codes
+        .filter(code => normalizeSearch(code).startsWith(term))
+        .slice(0, 12);
+      state.highlightedSuggestion = state.filteredCodes.length ? 0 : -1;
+      renderSuggestions();
+    }
+    function applySuggestion(code, shouldSearch = false) {
+      el.codeInput.value = code;
+      hideSuggestions();
+      if (shouldSearch) {
+        searchCode();
+      }
     }
     async function fetchJson(url) {
       const response = await fetch(url);
@@ -434,6 +537,7 @@ HTML_PAGE = r"""<!doctype html>
       if (!system) return;
       state.selected = system;
       state.codes = [];
+      hideSuggestions();
       clearResult();
       el.codeInput.value = "";
       el.selectedName.textContent = system.name;
@@ -468,8 +572,7 @@ HTML_PAGE = r"""<!doctype html>
         button.className = "code-chip";
         button.textContent = code;
         button.addEventListener("click", () => {
-          el.codeInput.value = code;
-          searchCode();
+          applySuggestion(code, true);
         });
         el.codesList.appendChild(button);
       }
@@ -499,8 +602,37 @@ HTML_PAGE = r"""<!doctype html>
         setStatus(error.message, "error");
       }
     }
+    el.codeInput.addEventListener("input", () => {
+      updateSuggestions();
+    });
+    el.codeInput.addEventListener("focus", () => {
+      updateSuggestions();
+    });
+    el.codeInput.addEventListener("keydown", event => {
+      if (!state.filteredCodes.length) return;
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        state.highlightedSuggestion = (state.highlightedSuggestion + 1) % state.filteredCodes.length;
+        renderSuggestions();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        state.highlightedSuggestion = (state.highlightedSuggestion - 1 + state.filteredCodes.length) % state.filteredCodes.length;
+        renderSuggestions();
+      } else if (event.key === "Enter" && state.highlightedSuggestion >= 0) {
+        event.preventDefault();
+        applySuggestion(state.filteredCodes[state.highlightedSuggestion], true);
+      } else if (event.key === "Escape") {
+        hideSuggestions();
+      }
+    });
+    document.addEventListener("click", event => {
+      if (!el.searchForm.contains(event.target)) {
+        hideSuggestions();
+      }
+    });
     el.searchForm.addEventListener("submit", event => {
       event.preventDefault();
+      hideSuggestions();
       searchCode();
     });
     loadSystems().catch(error => setStatus(error.message, "error"));
