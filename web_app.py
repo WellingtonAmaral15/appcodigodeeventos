@@ -8,7 +8,7 @@ from functools import lru_cache
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from openpyxl import load_workbook
 
@@ -17,629 +17,32 @@ APP_DIR = Path(__file__).resolve().parent
 ARQUIVOS_DIR = APP_DIR / "arquivos"
 ICONES_DIR = APP_DIR / "icones"
 ICONES2_DIR = APP_DIR / "icones2"
+INDEX_FILE = APP_DIR / "index.html"
 
-NUMERIC_SYSTEMS = {"EIMS NUM 2005.xlsm", "TMS NUM 3000.xlsm", "FREIO KNORR NUM 3000 4000 E 5000.xlsm"}
+# Informacoes mostradas no rodape. Edite aqui quando revisar as bases.
+APP_NOME = "Código de Eventos"
+APP_VERSAO = "2.0"
+DADOS_REVISADOS_EM = "outubro/2026"
+
 CODE_KEY = "CODIGO"
 DESCRIPTION_KEY = "DESCRICAO"
 COMPONENT_KEY = "COMPONENTE"
+
+# Sistemas cujos codigos numericos sao exibidos com zeros a esquerda (ex.: 300 -> 0300).
+NUMERIC_PADDING = {"FREIO KNORR 3000 4000 E 5000.xlsm": 4}
+
 SYSTEM_DISPLAY_ORDER = [
     "APU 2005 E 3000",
     "CVS 4000 E 5000",
     "EIMS 2005",
-    "EIMS NUM 2005",
     "FREIO KNORR 3000 4000 E 5000",
-    "FREIO KNORR NUM 3000 4000 E 5000",
     "VVVF 2005 E 3000",
     "INVERSOR DE TRACAO 4000 E 5000",
     "TMS 3000",
-    "TMS NUM 3000",
     "EVR 4000 E 5000",
     "PERFORMANCE 3000",
 ]
-
-
-HTML_PAGE = r"""<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Codigo de Eventos</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --bg: #eef3f5;
-      --panel: #ffffff;
-      --ink: #11242d;
-      --muted: #61727b;
-      --line: #d6e0e4;
-      --accent: #006d7e;
-      --accent-strong: #004f5c;
-      --warn: #b3261e;
-      --ok: #1f7a48;
-      --soft: #f7fafb;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: Segoe UI, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-    header {
-      position: sticky;
-      top: 0;
-      z-index: 5;
-      background: #001824;
-      color: #fff;
-      border-bottom: 3px solid var(--accent);
-    }
-    .topbar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: min(1180px, 100%);
-      margin: 0 auto;
-      padding: 10px 14px;
-    }
-    .brand-icon {
-      width: 42px;
-      height: 42px;
-      object-fit: contain;
-      flex: 0 0 auto;
-    }
-    h1 {
-      margin: 0;
-      font-size: 1.08rem;
-      line-height: 1.2;
-      letter-spacing: 0;
-    }
-    main {
-      width: min(1180px, 100%);
-      margin: 0 auto;
-      padding: 14px;
-      display: grid;
-      grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
-      gap: 14px;
-    }
-    section {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      min-width: 0;
-    }
-    .systems {
-      padding: 12px;
-      display: grid;
-      gap: 10px;
-      align-content: start;
-    }
-    .panel-title {
-      margin: 0 0 4px;
-      font-size: .9rem;
-      color: var(--muted);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .02em;
-    }
-    .system-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-    }
-    .system-button {
-      appearance: none;
-      display: grid;
-      grid-template-rows: 58px auto;
-      gap: 6px;
-      align-items: center;
-      justify-items: center;
-      min-height: 102px;
-      padding: 9px 7px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--soft);
-      color: var(--ink);
-      cursor: pointer;
-      font: inherit;
-      text-align: center;
-    }
-    .system-button:hover,
-    .system-button:focus-visible {
-      outline: 2px solid rgba(0, 109, 126, .22);
-      border-color: var(--accent);
-      background: #fff;
-    }
-    .system-button.active {
-      border-color: var(--accent);
-      background: #e8f5f6;
-      box-shadow: inset 0 0 0 1px var(--accent);
-    }
-    .system-button img {
-      width: 100%;
-      max-width: 92px;
-      height: 58px;
-      object-fit: contain;
-    }
-    .system-button span {
-      width: 100%;
-      min-height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow-wrap: anywhere;
-      font-size: .82rem;
-      font-weight: 700;
-      line-height: 1.15;
-    }
-    .workspace {
-      padding: 14px;
-      display: grid;
-      gap: 12px;
-      align-content: start;
-    }
-    .selected-system {
-      display: grid;
-      grid-template-columns: 92px minmax(0, 1fr);
-      gap: 12px;
-      align-items: center;
-      min-height: 98px;
-      padding: 10px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--soft);
-    }
-    .selected-system img {
-      width: 92px;
-      height: 72px;
-      object-fit: contain;
-    }
-    .selected-name {
-      margin: 0;
-      font-size: 1.2rem;
-      line-height: 1.2;
-      overflow-wrap: anywhere;
-    }
-    .hint {
-      margin: 4px 0 0;
-      color: var(--muted);
-      font-size: .92rem;
-    }
-    .search-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px;
-    }
-    .search-field {
-      position: relative;
-      min-width: 0;
-    }
-    input[type="search"] {
-      width: 100%;
-      min-height: 44px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 8px 10px;
-      color: var(--ink);
-      background: #fff;
-      font: inherit;
-    }
-    .suggestions {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0;
-      right: 0;
-      z-index: 10;
-      max-height: 240px;
-      overflow-y: auto;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      background: #fff;
-      box-shadow: 0 12px 24px rgba(17, 36, 45, .12);
-    }
-    .suggestions[hidden] {
-      display: none;
-    }
-    .suggestion-item {
-      width: 100%;
-      border: 0;
-      border-bottom: 1px solid var(--line);
-      padding: 10px 12px;
-      background: #fff;
-      color: var(--ink);
-      font: inherit;
-      font-weight: 600;
-      text-align: left;
-      cursor: pointer;
-    }
-    .suggestion-item:last-child {
-      border-bottom: 0;
-    }
-    .suggestion-item:hover,
-    .suggestion-item:focus-visible,
-    .suggestion-item.active {
-      background: #e8f5f6;
-      outline: none;
-    }
-    button.primary {
-      min-height: 44px;
-      border: 0;
-      border-radius: 7px;
-      padding: 0 18px;
-      background: var(--accent);
-      color: #fff;
-      font: inherit;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    button.primary:hover,
-    button.primary:focus-visible {
-      background: var(--accent-strong);
-      outline: 2px solid rgba(0, 109, 126, .22);
-    }
-    .codes-wrap { display: grid; gap: 8px; }
-    .codes-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      color: var(--muted);
-      font-size: .9rem;
-      font-weight: 700;
-    }
-    .codes-list {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      min-height: 46px;
-      scrollbar-width: thin;
-    }
-    .code-chip {
-      appearance: none;
-      flex: 0 0 auto;
-      min-width: 86px;
-      min-height: 38px;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      padding: 6px 10px;
-      background: #fff;
-      color: var(--ink);
-      font: inherit;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .code-chip:hover,
-    .code-chip:focus-visible {
-      border-color: var(--accent);
-      outline: 2px solid rgba(0, 109, 126, .18);
-    }
-    .result {
-      display: grid;
-      gap: 10px;
-      min-height: 150px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      background: #fff;
-    }
-    .result-line { display: grid; gap: 4px; }
-    .result-line strong {
-      color: var(--muted);
-      font-size: .86rem;
-      text-transform: uppercase;
-      letter-spacing: .02em;
-    }
-    .result-line span {
-      font-size: 1.05rem;
-      line-height: 1.35;
-      overflow-wrap: anywhere;
-    }
-    .status {
-      min-height: 22px;
-      color: var(--muted);
-      font-size: .92rem;
-    }
-    .status.error { color: var(--warn); font-weight: 700; }
-    .status.ok { color: var(--ok); font-weight: 700; }
-    .empty { color: var(--muted); font-weight: 600; padding: 8px 0; }
-    @media (max-width: 760px) {
-      main { grid-template-columns: 1fr; padding: 10px; }
-      .system-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .selected-system { grid-template-columns: 74px minmax(0, 1fr); }
-      .selected-system img { width: 74px; height: 58px; }
-      .search-row { grid-template-columns: 1fr; }
-      button.primary { width: 100%; }
-    }
-    @media (max-width: 460px) {
-      h1 { font-size: .98rem; }
-      .system-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .system-button { min-height: 96px; }
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="topbar">
-      <img class="brand-icon" src="/static/icones2/ferramenta.png" alt="">
-      <h1>Ferramenta de Analise de Falhas</h1>
-    </div>
-  </header>
-
-  <main>
-    <section class="systems" aria-labelledby="systems-title">
-      <h2 id="systems-title" class="panel-title">Sistemas</h2>
-      <div id="systems" class="system-grid"></div>
-    </section>
-
-    <section class="workspace" aria-live="polite">
-      <div class="selected-system">
-        <img id="selected-image" src="/static/icones2/images.png" alt="">
-        <div>
-          <h2 id="selected-name" class="selected-name">Selecione um Sistema</h2>
-          <p id="selected-hint" class="hint">Escolha um sistema para carregar os codigos.</p>
-        </div>
-      </div>
-
-      <form id="search-form" class="search-row">
-        <div class="search-field">
-          <input id="code-input" type="search" autocomplete="off" placeholder="Digite o codigo" aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions-list">
-          <div id="suggestions-list" class="suggestions" hidden></div>
-        </div>
-        <button class="primary" type="submit">Buscar</button>
-      </form>
-
-      <div class="codes-wrap">
-        <div class="codes-head">
-          <span>Codigos</span>
-          <span id="codes-count">0</span>
-        </div>
-        <div id="codes-list" class="codes-list">
-          <span class="empty">Nenhum sistema selecionado.</span>
-        </div>
-      </div>
-
-      <div id="status" class="status"></div>
-
-      <div class="result">
-        <div class="result-line">
-          <strong>Codigo</strong>
-          <span id="result-code">-</span>
-        </div>
-        <div class="result-line">
-          <strong>Componente</strong>
-          <span id="result-component">-</span>
-        </div>
-        <div class="result-line">
-          <strong>Descricao da Falha</strong>
-          <span id="result-description">-</span>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <script>
-    const state = { systems: [], selected: null, codes: [], filteredCodes: [], highlightedSuggestion: -1 };
-    const el = {
-      systems: document.getElementById("systems"),
-      selectedImage: document.getElementById("selected-image"),
-      selectedName: document.getElementById("selected-name"),
-      selectedHint: document.getElementById("selected-hint"),
-      codeInput: document.getElementById("code-input"),
-      searchForm: document.getElementById("search-form"),
-      suggestionsList: document.getElementById("suggestions-list"),
-      codesList: document.getElementById("codes-list"),
-      codesCount: document.getElementById("codes-count"),
-      status: document.getElementById("status"),
-      resultCode: document.getElementById("result-code"),
-      resultComponent: document.getElementById("result-component"),
-      resultDescription: document.getElementById("result-description")
-    };
-
-    function asset(path) {
-      return path.split("/").map(encodeURIComponent).join("/");
-    }
-    function normalizeSearch(value) {
-      return value
-        .trim()
-        .toUpperCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-    }
-    function setStatus(message, kind = "") {
-      el.status.textContent = message;
-      el.status.className = `status ${kind}`.trim();
-    }
-    function clearResult() {
-      el.resultCode.textContent = "-";
-      el.resultComponent.textContent = "-";
-      el.resultDescription.textContent = "-";
-    }
-    function hideSuggestions() {
-      state.filteredCodes = [];
-      state.highlightedSuggestion = -1;
-      el.suggestionsList.hidden = true;
-      el.suggestionsList.innerHTML = "";
-      el.codeInput.setAttribute("aria-expanded", "false");
-    }
-    function renderSuggestions() {
-      el.suggestionsList.innerHTML = "";
-      if (!state.filteredCodes.length) {
-        el.suggestionsList.hidden = true;
-        el.codeInput.setAttribute("aria-expanded", "false");
-        return;
-      }
-      state.filteredCodes.forEach((code, index) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = `suggestion-item${index === state.highlightedSuggestion ? " active" : ""}`;
-        button.textContent = code;
-        button.addEventListener("mousedown", event => {
-          event.preventDefault();
-          applySuggestion(code, true);
-        });
-        el.suggestionsList.appendChild(button);
-      });
-      el.suggestionsList.hidden = false;
-      el.codeInput.setAttribute("aria-expanded", "true");
-    }
-    function updateSuggestions() {
-      if (!state.selected) {
-        hideSuggestions();
-        return;
-      }
-      const term = normalizeSearch(el.codeInput.value);
-      if (!term) {
-        hideSuggestions();
-        return;
-      }
-      state.filteredCodes = state.codes
-        .filter(code => normalizeSearch(code).startsWith(term))
-        .slice(0, 12);
-      state.highlightedSuggestion = state.filteredCodes.length ? 0 : -1;
-      renderSuggestions();
-    }
-    function applySuggestion(code, shouldSearch = false) {
-      el.codeInput.value = code;
-      hideSuggestions();
-      if (shouldSearch) {
-        searchCode();
-      }
-    }
-    async function fetchJson(url) {
-      const response = await fetch(url);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Falha ao carregar dados.");
-      return data;
-    }
-    async function loadSystems() {
-      setStatus("Carregando sistemas...");
-      const data = await fetchJson("/api/systems");
-      state.systems = data.systems;
-      renderSystems();
-      setStatus(`${state.systems.length} sistemas carregados.`, "ok");
-    }
-    function renderSystems() {
-      el.systems.innerHTML = "";
-      for (const system of state.systems) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "system-button";
-        button.dataset.system = system.name;
-        button.innerHTML = `<img src="/static/icones/${asset(system.image)}" alt=""><span>${system.name}</span>`;
-        button.addEventListener("click", () => selectSystem(system.name));
-        el.systems.appendChild(button);
-      }
-    }
-    async function selectSystem(systemName) {
-      const system = state.systems.find(item => item.name === systemName);
-      if (!system) return;
-      state.selected = system;
-      state.codes = [];
-      hideSuggestions();
-      clearResult();
-      el.codeInput.value = "";
-      el.selectedName.textContent = system.name;
-      el.selectedImage.src = `/static/icones/${asset(system.image)}`;
-      el.selectedHint.textContent = system.numeric ? "Digite ou toque em um codigo numerico." : "Digite ou toque em um codigo alfabetico.";
-      document.querySelectorAll(".system-button").forEach(button => {
-        button.classList.toggle("active", button.dataset.system === system.name);
-      });
-      el.codesList.innerHTML = `<span class="empty">Carregando codigos...</span>`;
-      el.codesCount.textContent = "0";
-      setStatus("Carregando codigos...");
-      try {
-        const data = await fetchJson(`/api/codes?system=${encodeURIComponent(system.name)}`);
-        state.codes = data.codes;
-        renderCodes();
-        setStatus(`${system.name} selecionado.`, "ok");
-      } catch (error) {
-        el.codesList.innerHTML = `<span class="empty">Nao foi possivel carregar os codigos.</span>`;
-        setStatus(error.message, "error");
-      }
-    }
-    function renderCodes() {
-      el.codesCount.textContent = String(state.codes.length);
-      el.codesList.innerHTML = "";
-      if (!state.codes.length) {
-        el.codesList.innerHTML = `<span class="empty">Nenhum codigo encontrado.</span>`;
-        return;
-      }
-      for (const code of state.codes) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "code-chip";
-        button.textContent = code;
-        button.addEventListener("click", () => {
-          applySuggestion(code, true);
-        });
-        el.codesList.appendChild(button);
-      }
-    }
-    async function searchCode() {
-      if (!state.selected) {
-        setStatus("Selecione um sistema antes de buscar.", "error");
-        return;
-      }
-      const code = el.codeInput.value.trim();
-      if (!code) {
-        clearResult();
-        setStatus("Digite ou selecione um codigo.", "error");
-        return;
-      }
-      setStatus("Buscando codigo...");
-      try {
-        const data = await fetchJson(`/api/search?system=${encodeURIComponent(state.selected.name)}&code=${encodeURIComponent(code)}`);
-        el.resultCode.textContent = data.codigo || code;
-        el.resultComponent.textContent = data.componente || "-";
-        el.resultDescription.textContent = data.descricao || "-";
-        setStatus("Codigo encontrado.", "ok");
-      } catch (error) {
-        el.resultCode.textContent = code;
-        el.resultComponent.textContent = "Codigo invalido";
-        el.resultDescription.textContent = "Codigo nao contemplado no sistema";
-        setStatus(error.message, "error");
-      }
-    }
-    el.codeInput.addEventListener("input", () => {
-      updateSuggestions();
-    });
-    el.codeInput.addEventListener("focus", () => {
-      updateSuggestions();
-    });
-    el.codeInput.addEventListener("keydown", event => {
-      if (!state.filteredCodes.length) return;
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        state.highlightedSuggestion = (state.highlightedSuggestion + 1) % state.filteredCodes.length;
-        renderSuggestions();
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        state.highlightedSuggestion = (state.highlightedSuggestion - 1 + state.filteredCodes.length) % state.filteredCodes.length;
-        renderSuggestions();
-      } else if (event.key === "Enter" && state.highlightedSuggestion >= 0) {
-        event.preventDefault();
-        applySuggestion(state.filteredCodes[state.highlightedSuggestion], true);
-      } else if (event.key === "Escape") {
-        hideSuggestions();
-      }
-    });
-    document.addEventListener("click", event => {
-      if (!el.searchForm.contains(event.target)) {
-        hideSuggestions();
-      }
-    });
-    el.searchForm.addEventListener("submit", event => {
-      event.preventDefault();
-      hideSuggestions();
-      searchCode();
-    });
-    loadSystems().catch(error => setStatus(error.message, "error"));
-  </script>
-</body>
-</html>
-"""
+ICON_EXTENSIONS = (".svg", ".png")
 
 
 def normalize_code(value):
@@ -656,10 +59,23 @@ def normalize_key(value):
     return "".join(char for char in text if not unicodedata.combining(char))
 
 
+def compare_key(value):
+    """Chave de comparacao: sem acentos/maiusculas e, se for numero, sem zeros a esquerda."""
+    key = normalize_key(value)
+    if key.isdigit():
+        return key.lstrip("0") or "0"
+    return key
+
+
 def format_visible_code(code, filename):
-    if filename == "FREIO KNORR NUM 3000 4000 E 5000.xlsm" and code.isdigit():
-        return code.zfill(4)
+    width = NUMERIC_PADDING.get(filename)
+    if width and code.isdigit():
+        return code.zfill(width)
     return code
+
+
+def code_type(code):
+    return "numerico" if code.isdigit() else "alfabetico"
 
 
 def get_system_filename(system_name):
@@ -684,7 +100,8 @@ def read_event_rows(filename):
             continue
         rows.append({
             "codigo": code,
-            "codigo_visivel": format_visible_code(code, filename),
+            "visivel": format_visible_code(code, filename),
+            "tipo": code_type(code),
             "descricao": normalize_code(item.get(DESCRIPTION_KEY)),
             "componente": normalize_code(item.get(COMPONENT_KEY)),
         })
@@ -692,42 +109,48 @@ def read_event_rows(filename):
     return rows
 
 
-def find_event(rows, code, filename):
-    code = normalize_code(code)
-    if filename in NUMERIC_SYSTEMS:
-        code = code.lstrip("0") or "0"
-    else:
-        code = normalize_key(code)
+def find_event(rows, code):
+    wanted = compare_key(code)
     for row in rows:
-        row_code = row["codigo"]
-        if filename in NUMERIC_SYSTEMS:
-            compare_code = row_code.lstrip("0") or "0"
-        else:
-            compare_code = normalize_key(row_code)
-        if compare_code == code:
+        if compare_key(row["codigo"]) == wanted:
             return row
     return None
 
 
+def system_kind(rows):
+    kinds = {row["tipo"] for row in rows}
+    if kinds == {"numerico"}:
+        return "numerico"
+    if kinds == {"alfabetico"} or not kinds:
+        return "alfabetico"
+    return "misto"
+
+
 def list_systems():
-    systems = []
     order_map = {normalize_key(name): index for index, name in enumerate(SYSTEM_DISPLAY_ORDER)}
     icon_paths = sorted(
-        ICONES_DIR.glob("*.png"),
+        (p for p in ICONES_DIR.iterdir() if p.suffix.lower() in ICON_EXTENSIONS),
         key=lambda path: (order_map.get(normalize_key(path.stem), len(order_map)), path.name.casefold()),
     )
+    systems = []
+    seen = set()
     for icon_path in icon_paths:
         name = icon_path.stem
         filename = f"{name}.xlsm"
-        if not (ARQUIVOS_DIR / filename).is_file():
+        if name in seen or not (ARQUIVOS_DIR / filename).is_file():
             continue
+        seen.add(name)
         systems.append({
             "name": name,
-            "image": icon_path.name,
+            "icon": "/static/icones/" + quote(icon_path.name),
             "filename": filename,
-            "numeric": filename in NUMERIC_SYSTEMS,
+            "kind": system_kind(read_event_rows(filename)),
         })
     return systems
+
+
+def app_info():
+    return {"nome": APP_NOME, "versao": APP_VERSAO, "dados": DADOS_REVISADOS_EM}
 
 
 def json_bytes(payload):
@@ -763,9 +186,11 @@ class WebAppHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         try:
             if path == "/":
-                self.send_html(HTML_PAGE)
+                self.send_html(INDEX_FILE.read_text(encoding="utf-8"))
             elif path == "/api/systems":
-                self.send_json({"systems": list_systems()})
+                self.send_json({"systems": list_systems(), "app": app_info()})
+            elif path == "/api/events":
+                self.handle_events(query)
             elif path == "/api/codes":
                 self.handle_codes(query)
             elif path == "/api/search":
@@ -781,13 +206,27 @@ class WebAppHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             self.send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, f"Erro interno: {exc}")
 
+    def handle_events(self, query):
+        system = query.get("system", [""])[0]
+        if not system:
+            raise ValueError("Informe o sistema.")
+        rows = read_event_rows(get_system_filename(system))
+        self.send_json({
+            "system": system,
+            "kind": system_kind(rows),
+            "events": [
+                {k: row[k] for k in ("codigo", "visivel", "tipo", "componente", "descricao")}
+                for row in rows
+            ],
+        })
+
+    # Rotas antigas, mantidas por compatibilidade.
     def handle_codes(self, query):
         system = query.get("system", [""])[0]
         if not system:
             raise ValueError("Informe o sistema.")
-        filename = get_system_filename(system)
-        rows = read_event_rows(filename)
-        self.send_json({"system": system, "codes": [row["codigo_visivel"] for row in rows]})
+        rows = read_event_rows(get_system_filename(system))
+        self.send_json({"system": system, "codes": [row["visivel"] for row in rows]})
 
     def handle_search(self, query):
         system = query.get("system", [""])[0]
@@ -797,13 +236,12 @@ class WebAppHandler(BaseHTTPRequestHandler):
         if not code:
             raise ValueError("Informe o codigo.")
         filename = get_system_filename(system)
-        rows = read_event_rows(filename)
-        event = find_event(rows, code, filename)
+        event = find_event(read_event_rows(filename), code)
         if event is None:
             self.send_error_json(HTTPStatus.NOT_FOUND, "Codigo nao encontrado.")
             return
         self.send_json({
-            "codigo": format_visible_code(event["codigo"], filename),
+            "codigo": event["visivel"],
             "componente": event["componente"],
             "descricao": event["descricao"],
         })

@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements-web.txt ./
 RUN pip install --no-cache-dir -r requirements-web.txt
 
-COPY web_app.py ./
+COPY web_app.py index.html ./
 COPY arquivos ./arquivos
 COPY icones ./icones
 COPY icones2 ./icones2
