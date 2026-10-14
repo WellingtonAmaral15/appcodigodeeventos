@@ -21,7 +21,7 @@ INDEX_FILE = APP_DIR / "index.html"
 
 # Informacoes mostradas no rodape. Edite aqui quando revisar as bases.
 APP_NOME = "Código de Eventos"
-APP_VERSAO = "2.0"
+APP_VERSAO = "2.1"
 DADOS_REVISADOS_EM = "outubro/2026"
 
 CODE_KEY = "CODIGO"
@@ -29,20 +29,27 @@ DESCRIPTION_KEY = "DESCRICAO"
 COMPONENT_KEY = "COMPONENTE"
 
 # Sistemas cujos codigos numericos sao exibidos com zeros a esquerda (ex.: 300 -> 0300).
-NUMERIC_PADDING = {"FREIO KNORR 3000 4000 E 5000.xlsm": 4}
+NUMERIC_PADDING = {"FREIO KNORR 3000.xlsm": 4, "FREIO KNORR 4000 E 5000.xlsm": 4}
 
 SYSTEM_DISPLAY_ORDER = [
+    # A grade tem 2 colunas: cada par abaixo fica lado a lado.
     "APU 2005 E 3000",
     "CVS 4000 E 5000",
-    "EIMS 2005",
-    "FREIO KNORR 3000 4000 E 5000",
+    "FREIO KNORR 3000",
+    "FREIO KNORR 4000 E 5000",
     "VVVF 2005 E 3000",
     "INVERSOR DE TRACAO 4000 E 5000",
-    "TMS 3000",
+    "EIMS 2005",
     "EVR 4000 E 5000",
+    "TMS 3000",
     "PERFORMANCE 3000",
 ]
 ICON_EXTENSIONS = (".svg", ".png")
+
+
+# Algarismos de largura total (７０１４) parecem normais na planilha, mas a busca digitada
+# não os encontra. Trocamos pelos algarismos comuns ao ler o código.
+FULLWIDTH_DIGITS = {0xFF10 + i: ord("0") + i for i in range(10)}
 
 
 def normalize_code(value):
@@ -51,6 +58,10 @@ def normalize_code(value):
     if isinstance(value, float) and value.is_integer():
         value = int(value)
     return str(value).strip()
+
+
+def clean_code(value):
+    return normalize_code(value).translate(FULLWIDTH_DIGITS)
 
 
 def normalize_key(value):
@@ -69,13 +80,13 @@ def compare_key(value):
 
 def format_visible_code(code, filename):
     width = NUMERIC_PADDING.get(filename)
-    if width and code.isdigit():
+    if width and code.isascii() and code.isdigit():
         return code.zfill(width)
     return code
 
 
 def code_type(code):
-    return "numerico" if code.isdigit() else "alfabetico"
+    return "numerico" if code.isascii() and code.isdigit() else "alfabetico"
 
 
 def get_system_filename(system_name):
@@ -95,7 +106,7 @@ def read_event_rows(filename):
     rows = []
     for values in sheet.iter_rows(min_row=2, values_only=True):
         item = dict(zip(headers, values))
-        code = normalize_code(item.get(CODE_KEY))
+        code = clean_code(item.get(CODE_KEY))
         if not code:
             continue
         rows.append({
